@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:tic_tac_toe/easy_bot.dart';
+import 'package:tic_tac_toe/utils/bot_controller.dart';
+import 'package:tic_tac_toe/bots/easy_bot.dart';
+import 'package:tic_tac_toe/utils/utils.dart';
 
 void main() {
   runApp(const MyApp());
@@ -36,69 +38,71 @@ class _MyHomePageState extends State<MyHomePage> {
   String winner = '';
   int moves = 0;
   BotLevel selectedBotLevel = BotLevel.easy;
+  List<int> winningCombination = [];
 
   void resetGame() {
-    board = List.filled(9, '');
-    winner = '';
-    currentPlayer = 'X';
-    moves = 0;
+    setState(() {
+      board = List.filled(9, '');
+      currentPlayer = 'X';
+      moves = 0;
+      winner = '';
+      winningCombination.clear();
+    });
   }
 
   void checkWinner() {
-    if (moves > 9) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('It\'s a Draw!')),
+    if (Utils.isWinner(board, currentPlayer, winningCombination)) {
+      winner = currentPlayer;
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('$currentPlayer is the winner!'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                resetGame();
+              },
+              child: const Text('Restart'),
+            ),
+          ],
+        ),
+      );
+      return;
+    } else if (moves == 9) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('It\'s a draw!'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                resetGame();
+              },
+              child: const Text('Restart'),
+            ),
+          ],
+        ),
       );
       return;
     }
-    if ((board[0] == board[1] && board[1] == board[2]) && board[0] != '') {
-      winner = board[0];
-    } else if ((board[0] == board[4] && board[4] == board[8]) &&
-        board[0] != '') {
-      winner = board[0];
-    } else if ((board[0] == board[3] && board[3] == board[6]) &&
-        board[0] != '') {
-      winner = board[0];
-    } else if ((board[3] == board[4] && board[4] == board[5]) &&
-        board[3] != '') {
-      winner = board[3];
-    } else if ((board[1] == board[4] && board[4] == board[7]) &&
-        board[1] != '') {
-      winner = board[1];
-    } else if ((board[6] == board[7] && board[7] == board[8]) &&
-        board[6] != '') {
-      winner = board[6];
-    } else if ((board[6] == board[4] && board[4] == board[2]) &&
-        board[6] != '') {
-      winner = board[6];
-    } else if ((board[2] == board[5] && board[5] == board[8]) &&
-        board[2] != '') {
-      winner = board[2];
-    }
-
-    if (winner != '') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$winner is the winner!')),
-      );
-    }
+    currentPlayer = currentPlayer == 'X' ? 'O' : 'X';
   }
 
   void makeMove(int index) {
-    if (board[index] == '') {
-      setState(() {
-        board[index] = currentPlayer;
-        currentPlayer = currentPlayer == 'X' ? 'O' : 'X';
-        if (currentPlayer == 'O' && moves < 8) {
-          int botMove = easyBot.makeMove();
-          while (board[botMove] != '') {
-            botMove = easyBot.makeMove();
-          }
-          board[botMove] = currentPlayer;
-          currentPlayer = 'X';
-        }
-        moves += 2;
-      });
+    if (board[index] == '' && moves < 9) {
+      board[index] = currentPlayer;
+      moves += 1;
       checkWinner();
+
+      if (currentPlayer == 'O' && moves < 8 && winner == '') {
+        int botMove = BotController().makeMove(board, 'O', selectedBotLevel);
+        board[botMove] = currentPlayer;
+        moves += 1;
+        checkWinner();
+      }
+      setState(() {});
     }
   }
 
@@ -123,22 +127,23 @@ class _MyHomePageState extends State<MyHomePage> {
                     selectedBotLevel = value!;
                   });
                 },
-                child: const Row(
+                child: Row(
                   children: [
                     Radio<BotLevel>(
                       value: BotLevel.easy,
+                      enabled: moves > 0 ? false : true,
                     ),
-                    Text('Easy Bot'),
+                    const Text('Easy Bot'),
                     Radio<BotLevel>(
                       value: BotLevel.medium,
-                      enabled: false,
+                      enabled: moves > 0 ? false : true,
                     ),
-                    Text('Medium Bot'),
-                    Radio<BotLevel>(
+                    const Text('Medium Bot'),
+                    const Radio<BotLevel>(
                       value: BotLevel.hard,
                       enabled: false,
                     ),
-                    Text('Hard Bot'),
+                    const Text('Hard Bot'),
                   ],
                 ),
               ),
@@ -151,21 +156,34 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
                 children: [
                   for (int i = 0; i < 9; i++)
-                    InkWell(
-                      onTap: () {
-                        if (winner != '') return;
-                        makeMove(i);
-                      },
-                      child: Container(
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.teal),
-                        ),
-                        child: Center(
-                          child: Text(
-                            board[i],
-                            style: const TextStyle(
-                              fontSize: 42,
-                              color: Colors.teal,
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      child: InkWell(
+                        key: UniqueKey(),
+                        onTap: () {
+                          if (winner != '') return;
+                          makeMove(i);
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: winningCombination.contains(i)
+                                  ? Colors.red
+                                  : Colors.teal,
+                            ),
+                            color: winningCombination.contains(i)
+                                ? Colors.red.shade50
+                                : Colors.transparent,
+                          ),
+                          child: Center(
+                            child: Text(
+                              board[i],
+                              style: TextStyle(
+                                fontSize: 42,
+                                color: winningCombination.contains(i)
+                                    ? Colors.red
+                                    : Colors.teal,
+                              ),
                             ),
                           ),
                         ),
@@ -173,15 +191,18 @@ class _MyHomePageState extends State<MyHomePage> {
                     ),
                 ],
               ),
-              ElevatedButton(
-                onPressed: () {
-                  setState(
-                    () {
-                      resetGame();
-                    },
-                  );
-                },
-                child: const Text('Restart'),
+              Padding(
+                padding: const EdgeInsets.only(top: 24.0),
+                child: ElevatedButton(
+                  onPressed: () {
+                    setState(
+                      () {
+                        resetGame();
+                      },
+                    );
+                  },
+                  child: const Text('Restart'),
+                ),
               ),
             ],
           ),
@@ -190,5 +211,3 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 }
-
-enum BotLevel { easy, medium, hard }
