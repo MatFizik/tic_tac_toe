@@ -1,5 +1,6 @@
-import 'package:tic_tac_toe/bots/easy_bot.dart';
-import 'package:tic_tac_toe/bots/medium_bot.dart';
+import 'package:tic_tac_toe/utils/bots/easy_bot.dart';
+import 'package:tic_tac_toe/utils/bots/hard_bot.dart';
+import 'package:tic_tac_toe/utils/bots/medium_bot.dart';
 
 class BotController {
   int makeMove(List<String> board, String symbol, BotLevel level) {
@@ -9,7 +10,7 @@ class BotController {
       case BotLevel.medium:
         return MediumBot().makeMove(board, symbol);
       case BotLevel.hard:
-        return EasyBot().makeMove(board, symbol);
+        return HardBot().makeMove(board, symbol);
     }
   }
 }
